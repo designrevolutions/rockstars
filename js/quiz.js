@@ -31,10 +31,40 @@ export class QuizScheduler {
   }
 }
 
+// Each phrase array (e.g. success, fail) gets its own shuffled "bag", keyed
+// on the array itself. Lines are drawn from the bag until it is empty, then
+// it is refilled and reshuffled, so every line is used once before any
+// repeat, and the last line shown is never the first pick of the next round.
+const bags = new WeakMap();
+
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
 export function pickLine(value, fallback = '') {
   if (Array.isArray(value)) {
     const opts = value.filter((v) => typeof v === 'string' && v.trim());
-    return opts.length ? opts[Math.floor(Math.random() * opts.length)] : fallback;
+    if (!opts.length) return fallback;
+    let bag = bags.get(value);
+    if (!bag) {
+      bag = { remaining: [], last: null };
+      bags.set(value, bag);
+    }
+    if (!bag.remaining.length) {
+      bag.remaining = shuffle([...opts]);
+      // Picks pop from the end; move the just-shown line out of that slot.
+      const n = bag.remaining.length;
+      if (n > 1 && bag.remaining[n - 1] === bag.last) {
+        const j = Math.floor(Math.random() * (n - 1));
+        [bag.remaining[n - 1], bag.remaining[j]] = [bag.remaining[j], bag.remaining[n - 1]];
+      }
+    }
+    bag.last = bag.remaining.pop();
+    return bag.last;
   }
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
