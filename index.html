@@ -3,104 +3,199 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Filmcharts</title>
-<style>
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  html,
-  body {
-    min-height: 100%;
-  }
-
-  body {
-    min-height: 100vh;
-    overflow: hidden;
-    background: #000;
-  }
-
-  .space {
-    position: relative;
-    min-height: 100vh;
-    overflow: hidden;
-    background: #000;
-  }
-
-  .stars,
-  .stars::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-repeat: repeat;
-    pointer-events: none;
-  }
-
-  .stars {
-    opacity: .7;
-    background-image:
-      radial-gradient(1px 1px at 24px 48px, rgba(255,255,255,.9), transparent),
-      radial-gradient(1px 1px at 140px 96px, rgba(255,255,255,.55), transparent),
-      radial-gradient(1px 1px at 230px 28px, rgba(255,255,255,.75), transparent),
-      radial-gradient(1px 1px at 310px 170px, rgba(255,255,255,.6), transparent);
-    background-size: 360px 220px;
-  }
-
-  .stars::before {
-    opacity: .25;
-    background-image:
-      radial-gradient(1px 1px at 64px 118px, rgba(255,255,255,.9), transparent),
-      radial-gradient(1px 1px at 190px 38px, rgba(255,255,255,.7), transparent),
-      radial-gradient(1px 1px at 288px 145px, rgba(255,255,255,.8), transparent);
-    background-size: 420px 260px;
-    animation: occasionalTwinkle 18s ease-in-out infinite;
-  }
-
-  .planet-wrap {
-    position: absolute;
-    top: 8vh;
-    right: max(5vw, 28px);
-    width: min(360px, 42vw);
-    aspect-ratio: 1;
-    opacity: .72;
-    overflow: hidden;
-    border-radius: 50%;
-    filter: drop-shadow(0 0 34px rgba(88, 132, 210, .18));
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 46%, rgba(0,0,0,.8) 56%, transparent 72%);
-    mask-image: radial-gradient(circle at 50% 50%, #000 0 46%, rgba(0,0,0,.8) 56%, transparent 72%);
-  }
-
-  .planet {
-    width: 142%;
-    height: 142%;
-    object-fit: cover;
-    transform: translate(-15%, -15%);
-    mix-blend-mode: screen;
-  }
-
-  @keyframes occasionalTwinkle {
-    0%, 72%, 100% { opacity: .18; }
-    78%, 84% { opacity: .62; }
-  }
-
-  @media (max-width: 680px) {
-    .planet-wrap {
-      top: 10vh;
-      right: 8vw;
-      width: 58vw;
-      opacity: .58;
-    }
-  }
-</style>
+<meta name="description" content="A Space Invaders-style arcade game with times-tables training drills.">
+<meta name="theme-color" content="#060818">
+<title>Times Table Invaders</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8' shape-rendering='crispEdges'%3E%3Cpath fill='%237ff6ff' d='M2 0h1v1H2zM8 0h1v1H8zM3 1h1v1H3zM7 1h1v1H7zM2 2h7v1H2zM1 3h2v1H1zM4 3h3v1H4zM8 3h2v1H8zM0 4h11v1H0zM0 5h1v1H0zM2 5h7v1H2zM10 5h1v1h-1zM0 6h1v1H0zM2 6h1v1H2zM8 6h1v1H8zM10 6h1v1h-1zM3 7h2v1H3zM6 7h2v1H6z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<main class="space" aria-label="Empty starfield">
+<div class="backdrop" aria-hidden="true">
   <div class="stars"></div>
-  <div class="planet-wrap" aria-hidden="true">
-    <img class="planet" src="assets/broken-planet.png" alt="">
-  </div>
+  <div class="planet-wrap"><img class="planet" src="assets/broken-planet.png" alt=""></div>
+</div>
+
+<main id="app">
+  <!-- ============ WELCOME ============ -->
+  <section id="view-welcome" class="view" aria-labelledby="logo">
+    <h1 id="logo" class="logo"><span class="logo-top">Times Table</span><span class="logo-bottom">Invaders</span></h1>
+
+    <div class="welcome-grid">
+      <div class="card welcome-card">
+        <div id="welcome-returning" hidden>
+          <p class="welcome-line"><span id="welcome-greeting">Welcome back,</span> <strong id="welcome-name"></strong></p>
+          <button id="btn-play" class="btn btn-primary btn-big" type="button">Play</button>
+          <label class="field">
+            <span class="field-label">Switch user</span>
+            <select id="profile-select"></select>
+          </label>
+          <button id="btn-settings" class="btn" type="button">Settings</button>
+        </div>
+
+        <form id="welcome-create" hidden novalidate>
+          <p class="welcome-line">Enter your name, soldier</p>
+          <label class="field">
+            <span class="field-label">Name</span>
+            <input id="create-name" type="text" maxlength="16" autocomplete="off" spellcheck="false" placeholder="e.g. Sam">
+          </label>
+          <p id="create-error" class="error" role="alert"></p>
+          <button class="btn btn-primary btn-big" type="submit">Create profile</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">High scores</h2>
+        <ol id="leaderboard-welcome" class="leaderboard"></ol>
+      </div>
+    </div>
+
+    <div class="legend-row" aria-label="Points table">
+      <span><canvas class="legend-sprite" data-sprite="ufo"></canvas>? pts</span>
+      <span><canvas class="legend-sprite" data-sprite="squid"></canvas>30</span>
+      <span><canvas class="legend-sprite" data-sprite="crab"></canvas>20</span>
+      <span><canvas class="legend-sprite" data-sprite="octopus"></canvas>10</span>
+    </div>
+    <p class="help">Move with ← → or A D · Fire with Space · P pauses · M mutes. Answer the times-tables drills to keep training!</p>
+    <p id="storage-warning" class="error" hidden>Your browser is blocking local storage, so profiles and scores will not be saved after you close this tab.</p>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="view-game" class="view view-game" hidden>
+    <div class="stage" id="stage">
+      <canvas id="game" aria-label="Game screen"></canvas>
+
+      <div id="pause-overlay" class="overlay" hidden>
+        <div class="card overlay-card">
+          <h2 class="overlay-title">Paused</h2>
+          <button id="btn-resume" class="btn btn-primary" type="button">Resume</button>
+          <button id="btn-quit" class="btn" type="button">Quit to menu</button>
+          <p class="hint">Quitting abandons this run without saving a score.</p>
+        </div>
+      </div>
+
+      <div id="gameover-overlay" class="overlay" hidden>
+        <div class="card overlay-card">
+          <h2 class="overlay-title">Game over</h2>
+          <p class="final-score">Score <strong id="go-score">0</strong> · Wave <strong id="go-wave">1</strong></p>
+          <p id="go-rank" class="rank"></p>
+          <ol id="leaderboard-gameover" class="leaderboard compact"></ol>
+          <div class="btn-row">
+            <button id="btn-again" class="btn btn-primary" type="button">Play again</button>
+            <button id="btn-menu" class="btn" type="button">Menu</button>
+            <button id="btn-go-settings" class="btn" type="button">Settings</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="quiz-overlay" class="overlay quiz" hidden role="dialog" aria-modal="true" aria-labelledby="quiz-title">
+        <div class="card quiz-card">
+          <p id="quiz-title" class="quiz-title"></p>
+          <form id="quiz-form" autocomplete="off">
+            <div class="quiz-q">
+              <span id="quiz-a"></span><span class="op">×</span><span id="quiz-b"></span><span class="op">=</span>
+              <input id="quiz-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" aria-label="Your answer">
+            </div>
+            <button class="btn btn-primary" type="submit">Submit</button>
+          </form>
+          <div class="quiz-timer">
+            <span id="quiz-count" class="quiz-count">5</span>
+            <div class="quiz-track"><div id="quiz-bar" class="quiz-bar"></div></div>
+          </div>
+          <div id="quiz-feedback" hidden>
+            <p id="quiz-result" class="quiz-result"></p>
+            <p id="quiz-line" class="quiz-line"></p>
+            <p id="quiz-answer" class="quiz-answer"></p>
+            <p id="quiz-given" class="quiz-given"></p>
+            <button id="quiz-continue" class="btn" type="button">Continue</button>
+            <div class="quiz-track thin"><div id="quiz-auto" class="quiz-bar"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="touch-controls" aria-hidden="true">
+      <button class="touch-btn" data-key="left" type="button">◀</button>
+      <button class="touch-btn fire" data-key="fire" type="button">FIRE</button>
+      <button class="touch-btn" data-key="right" type="button">▶</button>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="view-settings" class="view view-settings" hidden>
+    <header class="settings-header">
+      <h1 class="page-title">Settings</h1>
+      <button id="btn-settings-back" class="btn" type="button">Back to menu</button>
+    </header>
+
+    <div class="settings-grid">
+      <section class="card">
+        <h2 class="card-title">Profile</h2>
+        <p>Current profile: <strong id="set-name"></strong></p>
+        <label class="field">
+          <span class="field-label">Times tables up to</span>
+          <select id="set-max-factor"></select>
+        </label>
+        <p class="hint">Changing this only affects this profile. Facts still in range keep their weights, new facts start fresh and facts out of range are dropped.</p>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Sound</h2>
+        <label class="check"><input type="checkbox" id="set-mute"> Mute all sound</label>
+        <label class="field">
+          <span class="field-label">Volume</span>
+          <input type="range" id="set-volume" min="0" max="100" step="5">
+        </label>
+        <label class="check"><input type="checkbox" id="set-speech"> Speak drill lines aloud</label>
+      </section>
+
+      <section class="card span-2">
+        <h2 class="card-title">Times-tables progress</h2>
+        <div id="set-stats" class="stats"></div>
+        <h3 class="sub-title">Facts that need the most training</h3>
+        <ol id="set-toughest" class="toughest"></ol>
+        <h3 class="sub-title">Weight of every fact</h3>
+        <p id="weight-hint" class="hint"></p>
+        <div class="grid-scroll"><div id="weight-grid" class="weight-grid"></div></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">High scores (all profiles)</h2>
+        <ol id="leaderboard-settings" class="leaderboard"></ol>
+        <button id="btn-clear-leaderboard" class="btn btn-danger-outline" type="button">Clear leaderboard</button>
+      </section>
+
+      <section class="card danger-zone">
+        <h2 class="card-title">Profiles &amp; data</h2>
+        <ul id="profile-list" class="profile-list"></ul>
+        <button id="btn-reset-progress" class="btn btn-danger-outline" type="button">Reset my times-tables progress</button>
+        <p class="hint">Reset puts this profile's weights and accuracy back to the start. Shared high scores are kept.</p>
+      </section>
+    </div>
+  </section>
 </main>
+
+<!-- ============ MODAL DIALOG ============ -->
+<div id="modal" class="modal" hidden>
+  <form id="modal-form" class="card modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title" novalidate>
+    <h2 id="modal-title" class="card-title"></h2>
+    <p id="modal-message"></p>
+    <label id="modal-field" class="field" hidden>
+      <span class="field-label">Name</span>
+      <input id="modal-input" type="text" maxlength="16" autocomplete="off" spellcheck="false">
+    </label>
+    <p id="modal-error" class="error" role="alert"></p>
+    <div class="btn-row">
+      <button id="modal-cancel" class="btn" type="button">Cancel</button>
+      <button id="modal-ok" class="btn btn-primary" type="submit">OK</button>
+    </div>
+  </form>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

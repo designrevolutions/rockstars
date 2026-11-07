@@ -1,0 +1,16 @@
+{
+  "_comment": "Lines shown (and optionally spoken) around each times-tables drill. Any line may be a single string or an array of strings; arrays pick one at random each time.",
+  "title": "Training drill, soldier!",
+  "success": "You are on the path to becoming a soldier — keep training hard!",
+  "fail": "You are weak, you need to train more, soldier.",
+  "correctLabel": "Correct!",
+  "wrongLabel": "Wrong!",
+  "timeoutLabel": "Time's up!",
+  "voice": {
+    "enabled": true,
+    "lang": "en-GB",
+    "rate": 0.95,
+    "pitch": 0.75,
+    "preferredVoices": ["Google UK English Male", "Daniel", "Microsoft Ryan Online (Natural) - English (United Kingdom)"]
+  }
+}
