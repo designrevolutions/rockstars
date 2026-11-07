@@ -54,26 +54,6 @@ function bunkerShape(x, y) {
   return true;
 }
 
-// The planet photo has a dark square background; crop it to a soft-edged
-// circle once so it blends into the starfield.
-function maskPlanet(img) {
-  const size = 260;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d');
-  const crop = Math.min(img.naturalWidth, img.naturalHeight) / 1.42;
-  g.drawImage(img, (img.naturalWidth - crop) / 2, (img.naturalHeight - crop) / 2, crop, crop, 0, 0, size, size);
-  g.globalCompositeOperation = 'destination-in';
-  const m = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  m.addColorStop(0, '#000');
-  m.addColorStop(0.62, '#000');
-  m.addColorStop(0.8, 'rgba(0,0,0,0.6)');
-  m.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = m;
-  g.fillRect(0, 0, size, size);
-  return c;
-}
-
 export class Game {
   constructor(canvas, hooks = {}) {
     this.canvas = canvas;
@@ -85,10 +65,6 @@ export class Game {
     this.lastTs = null;
     this.active = false;
     this.sprites = buildSprites();
-    this.planet = null;
-    const img = new Image();
-    img.onload = () => (this.planet = maskPlanet(img));
-    img.src = 'assets/broken-planet.webp';
     this.stars = Array.from({ length: 110 }, () => ({
       x: Math.random() * W,
       y: Math.random() * H,
@@ -670,14 +646,6 @@ export class Game {
     bg.addColorStop(1, '#170a2e');
     g.fillStyle = bg;
     g.fillRect(0, 0, W, H);
-
-    if (this.planet) {
-      g.save();
-      g.globalAlpha = 0.35;
-      g.globalCompositeOperation = 'screen';
-      g.drawImage(this.planet, W - 300, 30);
-      g.restore();
-    }
 
     for (const s of this.stars) {
       const a = 0.25 + 0.55 * s.z * (0.6 + 0.4 * Math.sin(t * 2 + s.p));
