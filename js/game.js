@@ -88,7 +88,7 @@ export class Game {
     this.planet = null;
     const img = new Image();
     img.onload = () => (this.planet = maskPlanet(img));
-    img.src = 'assets/broken-planet.png';
+    img.src = 'assets/broken-planet.webp';
     this.stars = Array.from({ length: 110 }, () => ({
       x: Math.random() * W,
       y: Math.random() * H,
