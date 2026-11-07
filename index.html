@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Filmcharts</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .space {
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .stars,
+  .stars::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat;
+    pointer-events: none;
+  }
+
+  .stars {
+    opacity: .7;
+    background-image:
+      radial-gradient(1px 1px at 24px 48px, rgba(255,255,255,.9), transparent),
+      radial-gradient(1px 1px at 140px 96px, rgba(255,255,255,.55), transparent),
+      radial-gradient(1px 1px at 230px 28px, rgba(255,255,255,.75), transparent),
+      radial-gradient(1px 1px at 310px 170px, rgba(255,255,255,.6), transparent);
+    background-size: 360px 220px;
+  }
+
+  .stars::before {
+    opacity: .25;
+    background-image:
+      radial-gradient(1px 1px at 64px 118px, rgba(255,255,255,.9), transparent),
+      radial-gradient(1px 1px at 190px 38px, rgba(255,255,255,.7), transparent),
+      radial-gradient(1px 1px at 288px 145px, rgba(255,255,255,.8), transparent);
+    background-size: 420px 260px;
+    animation: occasionalTwinkle 18s ease-in-out infinite;
+  }
+
+  .planet-wrap {
+    position: absolute;
+    top: 8vh;
+    right: max(5vw, 28px);
+    width: min(360px, 42vw);
+    aspect-ratio: 1;
+    opacity: .72;
+    overflow: hidden;
+    border-radius: 50%;
+    filter: drop-shadow(0 0 34px rgba(88, 132, 210, .18));
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 46%, rgba(0,0,0,.8) 56%, transparent 72%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 0 46%, rgba(0,0,0,.8) 56%, transparent 72%);
+  }
+
+  .planet {
+    width: 142%;
+    height: 142%;
+    object-fit: cover;
+    transform: translate(-15%, -15%);
+    mix-blend-mode: screen;
+  }
+
+  @keyframes occasionalTwinkle {
+    0%, 72%, 100% { opacity: .18; }
+    78%, 84% { opacity: .62; }
+  }
+
+  @media (max-width: 680px) {
+    .planet-wrap {
+      top: 10vh;
+      right: 8vw;
+      width: 58vw;
+      opacity: .58;
+    }
+  }
+</style>
+</head>
+<body>
+<main class="space" aria-label="Empty starfield">
+  <div class="stars"></div>
+  <div class="planet-wrap" aria-hidden="true">
+    <img class="planet" src="assets/broken-planet.png" alt="">
+  </div>
+</main>
+</body>
+</html>
