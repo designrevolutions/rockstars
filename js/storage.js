@@ -122,6 +122,42 @@ export function buildFacts(maxFactor, existing = {}) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Drill timing defaults (from data/config.json)                       */
+/* ------------------------------------------------------------------ */
+
+let drill = null;
+
+// Accepts the drillTiming object from data/config.json. Missing or bad
+// values fall back to random timing around 20 seconds.
+export function setDrillDefaults(json) {
+  const j = json && typeof json === 'object' ? json : {};
+  const min = Math.max(1, Math.round(Number(j.minIntervalSeconds) || 10));
+  const max = Math.max(min, Math.round(Number(j.maxIntervalSeconds) || 300));
+  const spread = Number(j.randomSpread);
+  drill = {
+    mode: j.mode === 'fixed' ? 'fixed' : 'random',
+    interval: clamp(Math.round(Number(j.intervalSeconds) || 20), min, max),
+    min,
+    max,
+    spread: Number.isFinite(spread) ? clamp(spread, 0, 0.95) : 0.5,
+  };
+}
+
+export function drillConfig() {
+  if (!drill) setDrillDefaults(null);
+  return drill;
+}
+
+function cleanDrill(d) {
+  const cfg = drillConfig();
+  const src = d && typeof d === 'object' ? d : {};
+  return {
+    mode: src.mode === 'fixed' || src.mode === 'random' ? src.mode : cfg.mode,
+    interval: clamp(Math.round(Number(src.interval) || cfg.interval), cfg.min, cfg.max),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Profiles                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -151,12 +187,14 @@ function freshStats() {
   return { asked: 0, correct: 0, wrong: 0, timeouts: 0 };
 }
 
-// "First use" of a profile: copy the seed facts into it.
+// "First use" of a profile: copy the seed facts into it. Also fills in
+// fields added in later versions (drill timing) for older profiles.
 function ensureFacts(p) {
   if (!p.facts || typeof p.facts !== 'object' || !Object.keys(p.facts).length) {
     p.facts = buildFacts(p.maxFactor);
   }
   if (!p.stats) p.stats = freshStats();
+  if (!p.drill) p.drill = cleanDrill(null);
 }
 
 export const Profiles = {
@@ -208,6 +246,7 @@ export const Profiles = {
       maxFactor: DEFAULT_MAX_FACTOR,
       facts: null,
       stats: freshStats(),
+      drill: cleanDrill(null),
     };
     ensureFacts(p);
     store.profiles[p.id] = p;
@@ -243,6 +282,14 @@ export const Profiles = {
     p.maxFactor = max;
     p.facts = buildFacts(max, p.facts);
     save();
+  },
+
+  setDrillTiming(id, patch) {
+    const p = store.profiles[id];
+    if (!p) return null;
+    p.drill = cleanDrill({ ...cleanDrill(p.drill), ...patch });
+    save();
+    return p.drill;
   },
 
   resetProgress(id) {

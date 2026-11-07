@@ -1,0 +1,10 @@
+{
+  "_comment": "Game-wide defaults. drillTiming seeds each new profile's drill settings; players can change their own in Settings. mode is \"random\" (a random moment around intervalSeconds) or \"fixed\" (exactly every intervalSeconds). randomSpread 0.5 means random gaps fall between 0.5x and 1.5x the interval.",
+  "drillTiming": {
+    "mode": "random",
+    "intervalSeconds": 20,
+    "minIntervalSeconds": 10,
+    "maxIntervalSeconds": 300,
+    "randomSpread": 0.5
+  }
+}

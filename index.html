@@ -2,7 +2,7 @@
 <html lang="en-GB">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="A Space Invaders-style arcade game with times-tables training drills.">
 <meta name="theme-color" content="#060818">
 <title>Times Table Invaders</title>
@@ -58,7 +58,11 @@
       <span><canvas class="legend-sprite" data-sprite="crab"></canvas>20</span>
       <span><canvas class="legend-sprite" data-sprite="octopus"></canvas>10</span>
     </div>
-    <p class="help">Move with ← → or A D · Fire with Space · P pauses · M mutes. Answer the times-tables drills to keep training!</p>
+    <p class="help">
+      <span class="help-keys">Move with ← → or A D, fire with Space, pause with P and mute with M.</span>
+      <span class="help-touch">Use the arrow buttons to move and FIRE to shoot.</span>
+      Every so often a times-tables drill freezes the battle. Answer it to keep training.
+    </p>
     <p id="storage-warning" class="error" hidden>Your browser is blocking local storage, so profiles and scores will not be saved after you close this tab.</p>
   </section>
 
@@ -70,9 +74,11 @@
       <div id="pause-overlay" class="overlay" hidden>
         <div class="card overlay-card">
           <h2 class="overlay-title">Paused</h2>
-          <button id="btn-resume" class="btn btn-primary" type="button">Resume</button>
-          <button id="btn-quit" class="btn" type="button">Quit to menu</button>
-          <p class="hint">Quitting abandons this run without saving a score.</p>
+          <div class="btn-stack">
+            <button id="btn-resume" class="btn btn-primary" type="button">Resume</button>
+            <button id="btn-quit" class="btn" type="button">Quit to menu</button>
+          </div>
+          <p class="hint">Quitting ends this run without saving a score.</p>
         </div>
       </div>
 
@@ -82,8 +88,8 @@
           <p class="final-score">Score <strong id="go-score">0</strong> · Wave <strong id="go-wave">1</strong></p>
           <p id="go-rank" class="rank"></p>
           <ol id="leaderboard-gameover" class="leaderboard compact"></ol>
-          <div class="btn-row">
-            <button id="btn-again" class="btn btn-primary" type="button">Play again</button>
+          <div class="btn-grid">
+            <button id="btn-again" class="btn btn-primary btn-wide" type="button">Play again</button>
             <button id="btn-menu" class="btn" type="button">Menu</button>
             <button id="btn-go-settings" class="btn" type="button">Settings</button>
           </div>
@@ -101,7 +107,7 @@
             <button class="btn btn-primary" type="submit">Submit</button>
           </form>
           <div class="quiz-timer">
-            <span id="quiz-count" class="quiz-count">5</span>
+            <span id="quiz-count" class="quiz-count" aria-live="off">5</span>
             <div class="quiz-track"><div id="quiz-bar" class="quiz-bar"></div></div>
           </div>
           <div id="quiz-feedback" hidden>
@@ -117,9 +123,9 @@
     </div>
 
     <div class="touch-controls" aria-hidden="true">
-      <button class="touch-btn" data-key="left" type="button">◀</button>
+      <button class="touch-btn arrow" data-key="left" type="button" aria-label="Move left">◀</button>
       <button class="touch-btn fire" data-key="fire" type="button">FIRE</button>
-      <button class="touch-btn" data-key="right" type="button">▶</button>
+      <button class="touch-btn arrow" data-key="right" type="button" aria-label="Move right">▶</button>
     </div>
   </section>
 
@@ -133,12 +139,53 @@
     <div class="settings-grid">
       <section class="card">
         <h2 class="card-title">Profile</h2>
-        <p>Current profile: <strong id="set-name"></strong></p>
+        <p class="card-lead">Playing as <strong id="set-name"></strong></p>
         <label class="field">
           <span class="field-label">Times tables up to</span>
           <select id="set-max-factor"></select>
         </label>
-        <p class="hint">Changing this only affects this profile. Facts still in range keep their weights, new facts start fresh and facts out of range are dropped.</p>
+        <p class="hint">Only this profile changes. Facts still in range keep their weights, new facts start fresh and facts out of range are dropped.</p>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Drill timing</h2>
+        <fieldset class="segmented">
+          <legend class="field-label">When drills appear</legend>
+          <div class="segmented-options">
+            <label><input type="radio" name="drill-mode" id="drill-mode-random" value="random"><span>Random</span></label>
+            <label><input type="radio" name="drill-mode" id="drill-mode-fixed" value="fixed"><span>Fixed</span></label>
+          </div>
+        </fieldset>
+        <div class="field">
+          <label class="field-label" id="drill-label" for="set-drill-seconds">On average every</label>
+          <div class="range-row">
+            <input type="range" id="set-drill-range" step="5" aria-labelledby="drill-label">
+            <span class="number-unit"><input type="number" id="set-drill-seconds" inputmode="numeric" step="1"> s</span>
+          </div>
+        </div>
+        <p id="drill-summary" class="hint"></p>
+        <p id="drill-override" class="hint warn" hidden></p>
+      </section>
+
+      <section class="card span-2">
+        <h2 class="card-title">Times-tables progress</h2>
+        <div id="set-stats" class="stats"></div>
+        <div class="card-section">
+          <h3 class="sub-title">Needs the most training</h3>
+          <ol id="set-toughest" class="toughest"></ol>
+        </div>
+        <div class="card-section">
+          <h3 class="sub-title">Weight of every fact</h3>
+          <p id="weight-hint" class="hint"></p>
+          <div class="grid-scroll"><div id="weight-grid" class="weight-grid"></div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">High scores</h2>
+        <p class="hint">Shared by every profile on this device.</p>
+        <ol id="leaderboard-settings" class="leaderboard"></ol>
+        <button id="btn-clear-leaderboard" class="btn btn-danger-outline card-action" type="button">Clear leaderboard</button>
       </section>
 
       <section class="card">
@@ -151,27 +198,13 @@
         <label class="check"><input type="checkbox" id="set-speech"> Speak drill lines aloud</label>
       </section>
 
-      <section class="card span-2">
-        <h2 class="card-title">Times-tables progress</h2>
-        <div id="set-stats" class="stats"></div>
-        <h3 class="sub-title">Facts that need the most training</h3>
-        <ol id="set-toughest" class="toughest"></ol>
-        <h3 class="sub-title">Weight of every fact</h3>
-        <p id="weight-hint" class="hint"></p>
-        <div class="grid-scroll"><div id="weight-grid" class="weight-grid"></div></div>
-      </section>
-
-      <section class="card">
-        <h2 class="card-title">High scores (all profiles)</h2>
-        <ol id="leaderboard-settings" class="leaderboard"></ol>
-        <button id="btn-clear-leaderboard" class="btn btn-danger-outline" type="button">Clear leaderboard</button>
-      </section>
-
-      <section class="card danger-zone">
-        <h2 class="card-title">Profiles &amp; data</h2>
+      <section class="card span-2 danger-zone">
+        <h2 class="card-title">Profiles and data</h2>
         <ul id="profile-list" class="profile-list"></ul>
-        <button id="btn-reset-progress" class="btn btn-danger-outline" type="button">Reset my times-tables progress</button>
-        <p class="hint">Reset puts this profile's weights and accuracy back to the start. Shared high scores are kept.</p>
+        <div class="danger-row">
+          <button id="btn-reset-progress" class="btn btn-danger-outline" type="button">Reset my progress</button>
+          <p class="hint">Puts this profile's weights and accuracy back to the start. High scores are kept.</p>
+        </div>
       </section>
     </div>
   </section>

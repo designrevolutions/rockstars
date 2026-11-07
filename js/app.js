@@ -7,6 +7,8 @@ import {
   Settings,
   setSeed,
   seedConfig,
+  setDrillDefaults,
+  drillConfig,
   storageIsPersistent,
   MIN_MAX_FACTOR,
   MAX_MAX_FACTOR,
@@ -56,17 +58,28 @@ async function loadJSON(url) {
   }
 }
 
-// ?quiz=10 shortens the drill interval to ~10 s, handy for testing.
-function quizWindow() {
+// ?quiz=5 overrides every profile's drill interval for this visit, which is
+// handy for testing. The profile's random/fixed mode still applies.
+function quizOverride() {
   const q = Number(new URLSearchParams(location.search).get('quiz'));
-  if (Number.isFinite(q) && q > 0) return [q * 0.75, q * 1.25];
-  return [40, 80];
+  return Number.isFinite(q) && q > 0 ? q : null;
+}
+
+function configureScheduler(p) {
+  const cfg = drillConfig();
+  const d = p.drill || cfg;
+  state.scheduler.configure({ mode: d.mode, interval: quizOverride() ?? d.interval, spread: cfg.spread });
 }
 
 async function boot() {
-  const [phrases, seed] = await Promise.all([loadJSON('data/phrases.json'), loadJSON('data/facts.json')]);
+  const [phrases, seed, config] = await Promise.all([
+    loadJSON('data/phrases.json'),
+    loadJSON('data/facts.json'),
+    loadJSON('data/config.json'),
+  ]);
   state.phrases = { ...FALLBACK_PHRASES, ...(phrases || {}) };
   setSeed(seed);
+  setDrillDefaults(config && config.drillTiming);
 
   // Make sure the pixel font is ready before the canvas draws text.
   if (document.fonts && document.fonts.load) {
@@ -77,7 +90,7 @@ async function boot() {
   }
 
   Sfx.configure(Settings.get());
-  state.scheduler = new QuizScheduler(...quizWindow());
+  state.scheduler = new QuizScheduler();
   state.quiz = new QuizUI($('#quiz-overlay'));
   state.game = new Game($('#game'), {
     onRealTick: onRealTick,
@@ -104,7 +117,7 @@ async function boot() {
 function showView(name) {
   state.view = name;
   for (const v of ['welcome', 'game', 'settings']) $(`#view-${v}`).hidden = v !== name;
-  document.body.classList.toggle('in-game', name === 'game');
+  document.documentElement.classList.toggle('in-game', name === 'game');
   if (name === 'welcome') renderWelcome();
   if (name === 'settings') renderSettings();
   window.scrollTo(0, 0);
@@ -246,7 +259,7 @@ function startGame() {
   $('#gameover-overlay').hidden = true;
   state.quiz.hide();
   state.quizActive = false;
-  state.scheduler.reset();
+  configureScheduler(p); // also starts a fresh gap
   state.game.start({ hiScore: Leaderboard.top(), playerName: p.name });
 }
 
@@ -452,6 +465,8 @@ function renderSettings() {
   }
   sel.value = String(p.maxFactor);
 
+  renderDrillTiming(p.drill);
+
   const s = Settings.get();
   $('#set-mute').checked = s.muted;
   $('#set-volume').value = Math.round(s.volume * 100);
@@ -486,7 +501,7 @@ function renderSettings() {
 
   const n = p.maxFactor;
   const grid = $('#weight-grid');
-  grid.style.gridTemplateColumns = `repeat(${n + 1}, 32px)`;
+  grid.style.gridTemplateColumns = `repeat(${n + 1}, minmax(22px, 36px))`;
   let html = '<div class="cell corner">×</div>';
   for (let b = 1; b <= n; b++) html += `<div class="cell head">${b}</div>`;
   for (let a = 1; a <= n; a++) {
@@ -504,13 +519,63 @@ function renderSettings() {
   $('#profile-list').innerHTML = Profiles.list()
     .map(
       (prof) =>
-        `<li><span>${escapeHtml(prof.name)}${prof.id === p.id ? '<span class="tag">(current)</span>' : ''}</span>` +
-        `<button class="btn btn-danger-outline" type="button" data-delete="${prof.id}">Delete</button></li>`
+        `<li><span class="profile-name">${escapeHtml(prof.name)}${prof.id === p.id ? '<span class="tag">Current</span>' : ''}</span>` +
+        `<button class="btn btn-danger-outline btn-small" type="button" data-delete="${prof.id}">Delete</button></li>`
     )
     .join('');
 }
 
+function drillSummary(mode, interval) {
+  const cfg = drillConfig();
+  if (mode === 'fixed') return `A drill pops up every ${interval} seconds of play.`;
+  const lo = Math.round(interval * (1 - cfg.spread));
+  const hi = Math.round(interval * (1 + cfg.spread));
+  return `A drill pops up at a random moment between ${lo} and ${hi} seconds of play, ${interval} seconds on average.`;
+}
+
+function renderDrillTiming(d, { keepNumber = false } = {}) {
+  const cfg = drillConfig();
+  for (const r of document.querySelectorAll('input[name="drill-mode"]')) r.checked = r.value === d.mode;
+  const range = $('#set-drill-range');
+  const num = $('#set-drill-seconds');
+  range.min = num.min = cfg.min;
+  range.max = num.max = cfg.max;
+  range.value = d.interval;
+  if (!keepNumber) num.value = d.interval;
+  $('#drill-label').textContent = d.mode === 'fixed' ? 'Exactly every' : 'On average every';
+  $('#drill-summary').textContent = drillSummary(d.mode, d.interval);
+  const override = quizOverride();
+  $('#drill-override').hidden = !override;
+  if (override) $('#drill-override').textContent = `The ?quiz=${override} address option is overriding this for the current visit.`;
+}
+
+function saveDrillTiming(patch, opts) {
+  const p = Profiles.active();
+  if (!p) return;
+  renderDrillTiming(Profiles.setDrillTiming(p.id, patch), opts);
+}
+
 function bindSettings() {
+  document.querySelectorAll('input[name="drill-mode"]').forEach((r) =>
+    r.addEventListener('change', () => saveDrillTiming({ mode: r.value }))
+  );
+  // The slider previews while dragging and saves when released.
+  $('#set-drill-range').addEventListener('input', (e) => {
+    const p = Profiles.active();
+    const v = Number(e.target.value);
+    $('#set-drill-seconds').value = v;
+    $('#drill-summary').textContent = drillSummary(p.drill.mode, v);
+  });
+  $('#set-drill-range').addEventListener('change', (e) => saveDrillTiming({ interval: Number(e.target.value) }));
+  // Typed values save once they are a whole number in range, and snap into
+  // range when the box loses focus.
+  $('#set-drill-seconds').addEventListener('input', (e) => {
+    const cfg = drillConfig();
+    const v = Number(e.target.value);
+    if (Number.isInteger(v) && v >= cfg.min && v <= cfg.max) saveDrillTiming({ interval: v }, { keepNumber: true });
+  });
+  $('#set-drill-seconds').addEventListener('change', (e) => saveDrillTiming({ interval: Number(e.target.value) }));
+
   $('#btn-settings-back').addEventListener('click', () => showView('welcome'));
 
   $('#set-max-factor').addEventListener('change', (e) => {

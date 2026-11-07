@@ -4,7 +4,7 @@ A Space Invaders-style arcade game that stops every minute or so for a quick tim
 
 ## Running it
 
-The game uses ES modules and loads two JSON files, so it must be served over HTTP. Opening `index.html` straight from disk will not work.
+The game uses ES modules and loads three JSON files from the data folder, so it must be served over HTTP. Opening `index.html` straight from disk will not work.
 
 ```sh
 python3 -m http.server 8000
@@ -25,7 +25,7 @@ Connect the repository in Cloudflare Pages and use these settings:
 
 | Option | Effect |
 | --- | --- |
-| `?quiz=10` | Fires a drill roughly every 10 seconds instead of every 40–80 seconds. |
+| `?quiz=5` | Overrides the drill interval with 5 seconds for this visit, keeping the profile's random or fixed mode. Settings shows a note while it is active. |
 | `?debug=1` | Exposes the app's internals on `window.__tti` for poking at in the console. |
 
 ## Controls
@@ -50,6 +50,7 @@ js/quiz.js          the drill scheduler and the drill overlay
 js/storage.js       localStorage: profiles, fact weights, leaderboard, device settings
 js/audio.js         every sound effect, synthesised with the Web Audio API
 js/sprites.js       pixel-art sprites drawn from text bitmaps
+data/config.json    default drill timing for new profiles
 data/facts.json     seed list of multiplication facts and the weight rules
 data/phrases.json   the lines shown and spoken after each drill
 assets/             the planet backdrop image
@@ -69,7 +70,32 @@ Freezing calls `game.hold('quiz')`, which cancels the animation frame. Nothing i
 
 Holds are a set of named reasons: `quiz`, `pause` and so on. The loop only runs when the set is empty. That lets independent reasons overlap safely. For example, if the tab is hidden during a drill, the game stays paused after the drill ends instead of springing back to life.
 
-The drill timer itself runs on real seconds, not simulation seconds. It is fed only by frames that actually ran, so it does not count time spent on menus, in the pause screen or inside a drill. After every drill, whatever the result, it draws a fresh random interval between 40 and 80 seconds so drills never feel metronomic.
+The drill timer itself runs on real seconds, not simulation seconds. It is fed only by frames that actually ran, so it does not count time spent on menus, in the pause screen or inside a drill. After every drill, whatever the result, it starts a fresh gap. How long that gap is depends on the profile's drill timing, described next.
+
+### Drill timing
+
+Each profile chooses how drills are spaced, in Settings under **Drill timing**:
+
+- **Random** spaces drills at a random moment around the chosen interval. With the default spread, a 20-second interval gives gaps anywhere from 10 to 30 seconds, averaging 20. This keeps drills from feeling predictable.
+- **Fixed** spaces drills exactly one interval apart, which suits a player who likes to know when the next one is coming.
+
+The interval can be set from 10 to 300 seconds. New profiles start from the defaults in `data/config.json`:
+
+```json
+{
+  "drillTiming": {
+    "mode": "random",
+    "intervalSeconds": 20,
+    "minIntervalSeconds": 10,
+    "maxIntervalSeconds": 300,
+    "randomSpread": 0.5
+  }
+}
+```
+
+`randomSpread` sets how far a random gap may stray from the interval. A value of 0.5 allows gaps from half to one and a half times the interval. Editing the file changes the starting point for new profiles. It never overrides a choice a player has already saved. Profiles created before drill timing existed pick up the file's defaults the next time they are used.
+
+Timing is stored per profile, like the table range, because the right pace depends on the learner. A confident player might want a drill every 15 seconds, while a younger sibling on the same device might prefer one a minute.
 
 ### Why facts use weights from a JSON file instead of plain random selection
 
@@ -134,7 +160,8 @@ Three keys are used, each versioned so the format can change later without misre
         "7x8": { "a": 7, "b": 8, "weight": 5, "asked": 4, "correct": 1 },
         "2x2": { "a": 2, "b": 2, "weight": 1, "asked": 3, "correct": 3 }
       },
-      "stats": { "asked": 7, "correct": 4, "wrong": 2, "timeouts": 1 }
+      "stats": { "asked": 7, "correct": 4, "wrong": 2, "timeouts": 1 },
+      "drill": { "mode": "random", "interval": 20 }  // seconds; mode is "random" or "fixed"
     }
   }
 }

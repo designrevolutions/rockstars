@@ -6,17 +6,24 @@ import { Sfx } from './audio.js';
 
 export const QUIZ_SECONDS = 5;
 
-// Accumulates real seconds of active play and fires after a random interval
-// drawn from [min, max]. reset() draws a fresh interval.
+// Accumulates real seconds of active play and fires when the current gap
+// has passed. In "fixed" mode every gap equals the interval. In "random"
+// mode each gap is drawn from interval × [1 - spread, 1 + spread], so the
+// average stays at the interval. reset() starts a fresh gap.
 export class QuizScheduler {
-  constructor(minSeconds = 40, maxSeconds = 80) {
-    this.min = minSeconds;
-    this.max = maxSeconds;
+  constructor() {
+    this.configure({ mode: 'random', interval: 20, spread: 0.5 });
+  }
+  configure({ mode, interval, spread = 0.5 }) {
+    this.mode = mode === 'fixed' ? 'fixed' : 'random';
+    this.interval = Math.max(1, Number(interval) || 20);
+    this.spread = Math.min(0.95, Math.max(0, spread));
     this.reset();
   }
   reset() {
     this.elapsed = 0;
-    this.next = this.min + Math.random() * (this.max - this.min);
+    const jitter = this.mode === 'fixed' ? 0 : (Math.random() * 2 - 1) * this.spread;
+    this.next = this.interval * (1 + jitter);
   }
   tick(dt) {
     this.elapsed += dt;
@@ -43,6 +50,8 @@ export class QuizUI {
     this.timerBox = this.$('.quiz-timer');
     this.feedbackBox = this.$('#quiz-feedback');
     this.continueBtn = this.$('#quiz-continue');
+    // The form never navigates; ask() swaps in the real handler.
+    this.form.addEventListener('submit', (e) => e.preventDefault());
     // Only digits in the answer box.
     this.input.addEventListener('input', () => {
       const clean = this.input.value.replace(/\D+/g, '').slice(0, 4);
