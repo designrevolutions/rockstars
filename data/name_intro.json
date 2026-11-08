@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "maxAutoPlays": 2,
+  "title": "Aiden",
+  "scrollDurationSeconds": 60,
+  "endDelaySeconds": 2,
+  "musicEnabled": true,
+  "musicVolume": 0.5,
+  "lines": [
+    "Aiden is a 9-year-old boy.",
+    "He has many things ahead of him in his destiny.",
+    "He doesn't know his powers yet.",
+    "He's a special little kid.",
+    "He's already a maths genius.",
+    "But people around him are pushing him on to bigger and better things.",
+    "He has a mum who works tirelessly.",
+    "He has a sister who annoys him (she's obviously just doing her job).",
+    "He has an old grandad who looks young, and who is there to guide him and help him with different things in his life.",
+    "Watch this space. Aiden has a fantastic future."
+  ]
+}

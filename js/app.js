@@ -18,6 +18,7 @@ import { Sfx } from './audio.js';
 import { Game } from './game.js';
 import { buildSprites } from './sprites.js';
 import { QuizScheduler, QuizUI, pickLine } from './quiz.js';
+import { Intro, parseIntroConfig, shouldAutoPlay, resetIntroCount } from './intro.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -41,6 +42,8 @@ const state = {
   quizActive: false,
   lastFactKey: null,
   justCreated: false,
+  intro: null,
+  introConfig: null,
 };
 
 /* ------------------------------------------------------------------ */
@@ -72,11 +75,18 @@ function configureScheduler(p) {
 }
 
 async function boot() {
-  const [phrases, seed, config] = await Promise.all([
+  const [phrases, seed, config, introRaw] = await Promise.all([
     loadJSON('data/phrases.json'),
     loadJSON('data/facts.json'),
     loadJSON('data/config.json'),
+    loadJSON('data/name_intro.json'),
   ]);
+  try {
+    setupIntro(introRaw);
+  } catch (err) {
+    console.warn('Intro disabled:', err);
+    $('#intro-link-row').hidden = true;
+  }
   state.phrases = { ...FALLBACK_PHRASES, ...(phrases || {}) };
   setSeed(seed);
   setDrillDefaults(config && config.drillTiming);
@@ -108,6 +118,26 @@ async function boot() {
   if (new URLSearchParams(location.search).has('debug')) {
     window.__tti = { state, Profiles, Leaderboard, Settings };
   }
+}
+
+// The opening crawl. Shown before the font wait so the Enter screen appears
+// as soon as possible; the welcome screen keeps booting behind it.
+function setupIntro(raw) {
+  const cfg = parseIntroConfig(raw);
+  state.introConfig = cfg && cfg.enabled ? cfg : null;
+  $('#intro-link-row').hidden = !state.introConfig;
+  if (!state.introConfig) return;
+  // ?intro=reset clears this device's auto-play count (handy for testing).
+  if (new URLSearchParams(location.search).get('intro') === 'reset') resetIntroCount();
+  state.intro = new Intro($('#intro'), {
+    isMuted: () => Settings.get().muted,
+    onClose: () => {
+      const play = $('#btn-play');
+      if (state.view === 'welcome' && play && play.offsetParent) play.focus({ preventScroll: true });
+    },
+  });
+  $('#btn-play-intro').addEventListener('click', () => state.intro.play(state.introConfig));
+  if (shouldAutoPlay(state.introConfig)) state.intro.autoPlay(state.introConfig);
 }
 
 /* ------------------------------------------------------------------ */

@@ -4,7 +4,7 @@ A Space Invaders-style arcade game that stops every minute or so for a quick tim
 
 ## Running it
 
-The game uses ES modules and loads three JSON files from the data folder, so it must be served over HTTP. Opening `index.html` straight from disk will not work.
+The game uses ES modules and loads four JSON files from the data folder, so it must be served over HTTP. Opening `index.html` straight from disk will not work.
 
 ```sh
 python3 -m http.server 8000
@@ -26,6 +26,7 @@ Connect the repository in Cloudflare Pages and use these settings:
 | Option | Effect |
 | --- | --- |
 | `?quiz=5` | Overrides the drill interval with 5 seconds for this visit, keeping the profile's random or fixed mode. Settings shows a note while it is active. |
+| `?intro=reset` | Resets this device's intro auto-play count, so the intro auto-plays again. |
 | `?debug=1` | Exposes the app's internals on `window.__tti` for poking at in the console. |
 
 ## Controls
@@ -50,9 +51,12 @@ js/quiz.js          the drill scheduler and the drill overlay
 js/storage.js       localStorage: profiles, fact weights, leaderboard, device settings
 js/audio.js         every sound effect, synthesised with the Web Audio API
 js/sprites.js       pixel-art sprites drawn from text bitmaps
+js/intro.js         the opening crawl: Enter screen, scroll, skip, auto-play count
+js/intro-music.js   the intro theme, synthesised with the Web Audio API
 data/config.json    default drill timing for new profiles
 data/facts.json     seed list of multiplication facts and the weight rules
 data/phrases.json   the lines shown and spoken after each drill
+data/name_intro.json  the opening crawl's story lines and settings
 assets/             the planet backdrop image
 ```
 

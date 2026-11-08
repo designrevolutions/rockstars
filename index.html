@@ -79,6 +79,7 @@
       <span class="help-touch">Use the arrow buttons to move and FIRE to shoot.</span>
       Every so often a times-tables drill freezes the battle. Answer it to keep training.
     </p>
+    <p id="intro-link-row" class="intro-link-row" hidden><button id="btn-play-intro" class="link-btn" type="button">Play intro</button></p>
     <p id="storage-warning" class="error" hidden>Your browser is blocking local storage, so profiles and scores will not be saved after you close this tab.</p>
   </section>
 
@@ -241,6 +242,26 @@
       <button id="modal-ok" class="btn btn-primary" type="submit">OK</button>
     </div>
   </form>
+</div>
+
+<!-- ============ INTRO CRAWL ============ -->
+<div id="intro" class="intro" hidden>
+  <div class="stars intro-stars" aria-hidden="true"></div>
+  <div id="intro-enter" class="intro-enter" hidden>
+    <button id="intro-enter-btn" class="btn btn-primary intro-enter-btn" type="button">Enter</button>
+  </div>
+  <div id="intro-stage" class="intro-stage" hidden>
+    <h1 id="intro-title" class="intro-title"></h1>
+    <div class="intro-perspective">
+      <div class="intro-plane"><div id="intro-crawl" class="intro-crawl"></div></div>
+    </div>
+  </div>
+  <div id="intro-static" class="intro-static" hidden>
+    <h1 id="intro-static-title" class="intro-static-title"></h1>
+    <div id="intro-static-text" class="intro-static-text"></div>
+    <button id="intro-continue" class="btn btn-primary" type="button">Continue</button>
+  </div>
+  <button id="intro-skip" class="btn intro-skip" type="button" hidden>Skip</button>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>

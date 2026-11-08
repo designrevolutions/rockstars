@@ -597,6 +597,148 @@ input[type="range"] { width: 100%; accent-color: var(--magenta); min-height: 32p
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ---------- Small screens ---------- */
+/* ---------- Intro crawl ---------- */
+html.intro-open, html.intro-open body { overflow: hidden; overscroll-behavior: none; }
+
+.intro-link-row { margin: calc(-1 * var(--s5)) 0 0; text-align: center; }
+.link-btn {
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--cyan);
+  background: none;
+  border: 0;
+  padding: var(--s2) var(--s3);
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link-btn:hover { color: #fff; }
+.link-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 4px; }
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 130%, #120826 0%, transparent 55%), #000;
+  opacity: 1;
+  transition: opacity var(--intro-fade, 0ms) ease;
+}
+.intro.is-leaving { opacity: 0; pointer-events: none; }
+.intro-stars { opacity: 1; background-size: 240px 160px; }
+.intro-stars::before { opacity: .5; background-size: 300px 190px; }
+
+.intro-enter {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--s5) var(--gutter-r) var(--s5) var(--gutter-l);
+}
+.intro-enter-btn {
+  font-size: clamp(20px, 6vw, 32px);
+  min-width: min(280px, 80vw);
+  min-height: 88px;
+  padding: var(--s4) var(--s6);
+  border-radius: var(--radius);
+  box-shadow: 0 0 32px rgba(255, 94, 247, .45);
+}
+
+.intro-stage { position: absolute; inset: 0; }
+.intro-title {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  width: 92vw;
+  text-align: center;
+  font-family: var(--pixel);
+  font-weight: 400;
+  font-size: clamp(40px, 15vw, 132px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  color: var(--yellow);
+  text-shadow: 0 0 24px rgba(255, 210, 63, .45);
+  opacity: 0;
+  pointer-events: none;
+}
+/* The plane tilts back about its bottom edge; text sliding up it recedes
+   towards a vanishing point just above the screen, and a mask fades it out
+   near the top. perspective ≈ 1.15 × height × tan(25deg). */
+.intro-perspective {
+  position: absolute;
+  inset: 0;
+  perspective: 54vh;
+  perspective-origin: 50% 100%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 16%, #000 50%);
+  mask-image: linear-gradient(to bottom, transparent 0%, transparent 16%, #000 50%);
+}
+.intro-plane {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  height: 0;
+  width: min(88vw, 34em);
+  font-size: clamp(20px, 5.4vw, 34px);
+  transform-origin: 50% 100%;
+  transform: translateX(-50%) rotateX(25deg);
+}
+.intro-crawl {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  font-family: var(--sans);
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--yellow);
+  will-change: transform;
+}
+.intro-crawl p, .intro-static-text p { margin: 0 0 1.1em; text-wrap: pretty; }
+
+.intro-static {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s5);
+  padding: calc(var(--s7) + env(safe-area-inset-top, 0px)) var(--gutter-r) calc(var(--s7) + env(safe-area-inset-bottom, 0px)) var(--gutter-l);
+}
+.intro-static-title {
+  margin: 0;
+  font-family: var(--pixel);
+  font-weight: 400;
+  font-size: clamp(28px, 10vw, 64px);
+  color: var(--yellow);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.intro-static-text {
+  max-width: 34em;
+  font-weight: 700;
+  font-size: clamp(17px, 4.4vw, 22px);
+  line-height: 1.5;
+  text-align: center;
+  color: var(--yellow);
+}
+.intro-static .btn { min-width: 200px; min-height: 56px; flex: none; }
+
+.intro-skip {
+  position: absolute;
+  right: calc(var(--s4) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--s4) + env(safe-area-inset-bottom, 0px));
+  z-index: 2;
+  min-width: 112px;
+  min-height: 52px;
+  background: rgba(14, 16, 44, .8);
+}
+
 @media (max-width: 720px) {
   :root { --card-pad: 20px; }
   .view { padding-top: var(--s5); gap: var(--s5); }
