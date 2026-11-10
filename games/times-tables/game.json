@@ -1,0 +1,7 @@
+{
+  "_comment": "Times-tables drill. name is shown in the quiz menus. timeLimitSeconds is how long the player has to answer each drill. phrases and stylesheet are files in this folder that the app loads for this quiz.",
+  "name": "Times tables",
+  "timeLimitSeconds": 5,
+  "phrases": "phrases.json",
+  "stylesheet": "style.css"
+}

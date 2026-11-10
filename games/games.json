@@ -1,0 +1,4 @@
+{
+  "_comment": "The quizzes this app offers, in menu order. Each entry is a folder name under games/. To add a quiz, create games/<name>/ with game.json and game.js, then add <name> here.",
+  "games": ["times-tables", "flags"]
+}

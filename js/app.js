@@ -1,28 +1,19 @@
-// App controller: views, profiles, settings, and the glue between the game
-// loop and the times-tables drill (freeze on trigger, thaw on resolve).
+// App controller (the shared shell): views, profiles, quiz selection,
+// settings, and the glue between the arcade loop and the current quiz's
+// drill (freeze on trigger, thaw on resolve). Everything specific to one
+// quiz lives in its folder under games/; see js/games.js for the contract.
 
-import {
-  Profiles,
-  Leaderboard,
-  Settings,
-  setSeed,
-  seedConfig,
-  setDrillDefaults,
-  drillConfig,
-  storageIsPersistent,
-  MIN_MAX_FACTOR,
-  MAX_MAX_FACTOR,
-  factKey,
-} from './storage.js';
+import { Profiles, Leaderboard, Settings, setDrillDefaults, drillConfig, storageIsPersistent } from './storage.js';
 import { Sfx } from './audio.js';
 import { Game } from './game.js';
 import { buildSprites } from './sprites.js';
 import { QuizScheduler, QuizUI, pickLine } from './quiz.js';
+import { loadGames } from './games.js';
 import { Intro, parseIntroConfig, shouldAutoPlay, resetIntroCount } from './intro.js';
 
 const $ = (sel) => document.querySelector(sel);
 
-// Used only if data/phrases.json cannot be loaded or is malformed.
+// Used for any line a game's phrases.json leaves out, or if it is missing.
 const FALLBACK_PHRASES = {
   title: 'Training drill, soldier!',
   success: 'Well done, soldier!',
@@ -30,17 +21,19 @@ const FALLBACK_PHRASES = {
   correctLabel: 'Correct!',
   wrongLabel: 'Wrong!',
   timeoutLabel: "Time's up!",
-  voice: { enabled: false },
 };
 
 const state = {
   view: 'welcome',
-  phrases: FALLBACK_PHRASES,
+  games: [], // loaded quizzes, in games/games.json order
+  defaultGame: null, // from data/settings.json
+  voice: { enabled: false }, // from data/settings.json
+  settingsGame: null, // which quiz the Settings page is showing
   game: null,
   scheduler: null,
   quiz: null,
   quizActive: false,
-  lastFactKey: null,
+  quizToken: 0, // bumps for every drill, so a stale one can tell it is stale
   justCreated: false,
   intro: null,
   introConfig: null,
@@ -75,21 +68,20 @@ function configureScheduler(p) {
 }
 
 async function boot() {
-  const [phrases, seed, config, introRaw] = await Promise.all([
-    loadJSON('data/phrases.json'),
-    loadJSON('data/facts.json'),
-    loadJSON('data/config.json'),
-    loadJSON('data/name_intro.json'),
-  ]);
+  const services = { loadJSON, ui: { escapeHtml, toast, confirm: confirmDialog } };
+  const gamesLoading = loadGames(services);
+  const [settings, introRaw] = await Promise.all([loadJSON('data/settings.json'), loadJSON('data/name_intro.json')]);
   try {
     setupIntro(introRaw);
   } catch (err) {
     console.warn('Intro disabled:', err);
     $('#intro-link-row').hidden = true;
   }
-  state.phrases = { ...FALLBACK_PHRASES, ...(phrases || {}) };
-  setSeed(seed);
-  setDrillDefaults(config && config.drillTiming);
+  setDrillDefaults(settings && settings.drillTiming);
+  if (settings && settings.voice && typeof settings.voice === 'object') state.voice = settings.voice;
+  state.defaultGame = settings && typeof settings.defaultGame === 'string' ? settings.defaultGame : null;
+  state.games = await gamesLoading;
+  if (!state.games.length) console.error('No quizzes could be loaded, so drills are switched off.');
 
   // Make sure the pixel font is ready before the canvas draws text.
   if (document.fonts && document.fonts.load) {
@@ -116,7 +108,7 @@ async function boot() {
   if (!storageIsPersistent()) $('#storage-warning').hidden = false;
   // ?debug=1 exposes internals on window for testing from the console.
   if (new URLSearchParams(location.search).has('debug')) {
-    window.__tti = { state, Profiles, Leaderboard, Settings };
+    window.__tti = { state, Profiles, Leaderboard, Settings, currentGame };
   }
 }
 
@@ -149,7 +141,10 @@ function showView(name) {
   for (const v of ['welcome', 'game', 'settings']) $(`#view-${v}`).hidden = v !== name;
   document.documentElement.classList.toggle('in-game', name === 'game');
   if (name === 'welcome') renderWelcome();
-  if (name === 'settings') renderSettings();
+  if (name === 'settings') {
+    state.settingsGame = currentGame()?.id ?? null;
+    renderSettings();
+  }
   window.scrollTo(0, 0);
 }
 
@@ -193,6 +188,26 @@ function drawLegend() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Quiz selection                                                      */
+/* ------------------------------------------------------------------ */
+
+const findGame = (id) => state.games.find((g) => g.id === id) || null;
+
+// The profile's chosen quiz, else the default from data/settings.json,
+// else the first quiz that loaded.
+function currentGame() {
+  const p = Profiles.active();
+  return (p && findGame(p.game)) || findGame(state.defaultGame) || state.games[0] || null;
+}
+
+function fillGameSelect(sel, selectedId) {
+  sel.innerHTML = '';
+  for (const g of state.games) sel.add(new Option(g.meta.name, g.id, false, g.id === selectedId));
+  sel.value = selectedId || '';
+  sel.disabled = state.games.length < 2;
+}
+
+/* ------------------------------------------------------------------ */
 /* Welcome / profile switching                                         */
 /* ------------------------------------------------------------------ */
 
@@ -213,6 +228,7 @@ function renderWelcome() {
     }
     sel.add(new Option('+ Create new profile', NEW_PROFILE));
     sel.value = p.id;
+    fillGameSelect($('#game-select'), currentGame()?.id);
   } else {
     $('#create-name').value = '';
     $('#create-error').textContent = '';
@@ -237,6 +253,10 @@ async function createProfileFlow() {
 function bindWelcome() {
   $('#btn-play').addEventListener('click', startGame);
   $('#btn-settings').addEventListener('click', () => showView('settings'));
+  $('#game-select').addEventListener('change', (e) => {
+    const p = Profiles.active();
+    if (p) Profiles.setGame(p.id, e.target.value);
+  });
 
   $('#profile-select').addEventListener('change', async (e) => {
     const value = e.target.value;
@@ -330,16 +350,32 @@ function onRealTick(dt) {
 
 async function runQuiz() {
   const p = Profiles.active();
-  if (!p) return;
+  const quiz = currentGame();
+  if (!p || !quiz) return state.scheduler.reset();
+  const token = ++state.quizToken;
+  const stale = () => !state.quizActive || token !== state.quizToken;
   state.quizActive = true;
   state.game.hold('quiz'); // freeze: the loop stops right here
 
-  const fact = Profiles.pickFact(p.id, state.lastFactKey);
-  state.lastFactKey = fact.key;
-  const ph = state.phrases;
-  const { outcome, given } = await state.quiz.ask(fact, pickLine(ph.title, FALLBACK_PHRASES.title));
+  const ph = { ...FALLBACK_PHRASES, ...quiz.phrases };
+  let question = null;
+  try {
+    question = await quiz.game.newQuestion();
+  } catch (err) {
+    console.warn(`${quiz.id}: could not make a question:`, err);
+  }
+  if (stale()) return; // quit to the menu while it loaded
+  if (question == null) return endQuiz();
 
-  Profiles.recordAnswer(p.id, fact.a, fact.b, outcome);
+  const { outcome, given } = await state.quiz.ask({
+    game: quiz,
+    question,
+    title: pickLine(ph.title, FALLBACK_PHRASES.title),
+    seconds: quiz.meta.timeLimitSeconds,
+  });
+  if (stale()) return; // quit to the menu mid-question: nothing is recorded
+
+  quiz.game.record(question, outcome);
   const ok = outcome === 'correct';
   const line = ok ? pickLine(ph.success, FALLBACK_PHRASES.success) : pickLine(ph.fail, FALLBACK_PHRASES.fail);
   const label = ok
@@ -349,12 +385,24 @@ async function runQuiz() {
       : pickLine(ph.wrongLabel, 'Wrong!');
   if (ok) Sfx.success();
   else Sfx.fail();
-  speak(line, ok ? 300 : 1600);
+  const spoken = quiz.game.spokenAnswer?.(question, outcome) || '';
+  speak(spoken ? `${spoken} ${line}` : line, ok ? 300 : 1600, quiz.phrases.voice);
 
-  await state.quiz.feedback({ outcome, fact, given, label, line });
+  await state.quiz.feedback({
+    outcome,
+    given,
+    label,
+    line,
+    answer: quiz.game.answerText(question),
+    givenText: outcome === 'wrong' ? quiz.game.givenText(question, given) : '',
+  });
 
   // The player may have quit to the menu meanwhile.
-  if (!state.quizActive) return;
+  if (stale()) return;
+  endQuiz();
+}
+
+function endQuiz() {
   state.quiz.hide();
   state.quizActive = false;
   state.scheduler.reset(); // draw a fresh random interval
@@ -436,7 +484,7 @@ function bindGame() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Speech (optional, voice settings come from phrases.json)            */
+/* Speech (voice from data/settings.json; a game's phrases may override) */
 /* ------------------------------------------------------------------ */
 
 let voices = [];
@@ -450,8 +498,8 @@ function speechCancel() {
   if ('speechSynthesis' in window) speechSynthesis.cancel();
 }
 
-function speak(text, delayMs = 0) {
-  const v = state.phrases.voice || {};
+function speak(text, delayMs = 0, override = null) {
+  const v = { ...state.voice, ...(override && typeof override === 'object' ? override : {}) };
   const s = Settings.get();
   if (!('speechSynthesis' in window) || v.enabled === false || !s.speech || s.muted) return;
   speechCancel();
@@ -473,27 +521,12 @@ function speak(text, delayMs = 0) {
 /* Settings                                                            */
 /* ------------------------------------------------------------------ */
 
-// Weight 1 (the floor) is a calm teal; anything above it jumps to warm
-// amber and heats up to hot pink at the maximum, so trouble spots stand out.
-function weightStyle(w, min, max) {
-  if (w <= min) return 'background:rgba(77,255,192,.16);color:#7dffd0';
-  const t = max > min + 1 ? (w - min - 1) / (max - min - 1) : 1;
-  const hue = (45 - t * 75 + 360) % 360;
-  return `background:hsl(${hue} 95% ${62 - t * 6}%);color:#14081f`;
-}
-
 function renderSettings() {
   const p = Profiles.active();
   if (!p) return showView('welcome');
-  const cfg = seedConfig();
 
   $('#set-name').textContent = p.name;
-  const sel = $('#set-max-factor');
-  sel.innerHTML = '';
-  for (let n = MIN_MAX_FACTOR; n <= MAX_MAX_FACTOR; n++) {
-    sel.add(new Option(`${n} × ${n}${n === 12 ? ' (default)' : ''}`, String(n), false, n === p.maxFactor));
-  }
-  sel.value = String(p.maxFactor);
+  $('#set-game').textContent = currentGame()?.meta.name ?? 'None available';
 
   renderDrillTiming(p.drill);
 
@@ -502,48 +535,7 @@ function renderSettings() {
   $('#set-volume').value = Math.round(s.volume * 100);
   $('#set-speech').checked = s.speech;
 
-  const st = p.stats;
-  const acc = st.asked ? Math.round((st.correct / st.asked) * 100) + '%' : '–';
-  $('#set-stats').innerHTML = [
-    [st.asked, 'Drills answered'],
-    [st.correct, 'Correct'],
-    [acc, 'Accuracy'],
-    [st.timeouts, 'Timed out'],
-  ]
-    .map(([v, l]) => `<div class="stat"><span class="stat-value">${v}</span><span class="stat-label">${l}</span></div>`)
-    .join('');
-
-  const facts = Object.values(p.facts);
-  const tough = facts
-    .filter((f) => f.weight > cfg.minWeight)
-    .sort((a, b) => b.weight - a.weight || a.a - b.a || a.b - b.b)
-    .slice(0, 8);
-  $('#set-toughest').innerHTML = tough.length
-    ? tough
-        .map((f) => `<li>${f.a} × ${f.b}<small>weight ${f.weight} · ${f.correct}/${f.asked} right</small></li>`)
-        .join('')
-    : '<li class="empty">No trouble spots yet. Missed facts will show up here.</li>';
-
-  $('#weight-hint').textContent =
-    `A higher weight means the fact comes up more often. A miss adds ${cfg.wrongDelta}, ` +
-    `a correct answer changes it by ${cfg.correctDelta}, and weights stay between ${cfg.minWeight} and ${cfg.maxWeight}. ` +
-    `Hover or tap a cell for details.`;
-
-  const n = p.maxFactor;
-  const grid = $('#weight-grid');
-  grid.style.gridTemplateColumns = `repeat(${n + 1}, minmax(22px, 36px))`;
-  let html = '<div class="cell corner">×</div>';
-  for (let b = 1; b <= n; b++) html += `<div class="cell head">${b}</div>`;
-  for (let a = 1; a <= n; a++) {
-    html += `<div class="cell head">${a}</div>`;
-    for (let b = 1; b <= n; b++) {
-      const f = p.facts[factKey(a, b)];
-      const tip = `${a} × ${b} = ${a * b}\nWeight ${f.weight}\nAnswered ${f.correct}/${f.asked} correctly`;
-      html += `<div class="cell fact" title="${tip}" style="${weightStyle(f.weight, cfg.minWeight, cfg.maxWeight)}">${f.weight}</div>`;
-    }
-  }
-  grid.innerHTML = html;
-
+  renderGameSettings();
   renderLeaderboard($('#leaderboard-settings'));
 
   $('#profile-list').innerHTML = Profiles.list()
@@ -553,6 +545,24 @@ function renderSettings() {
         `<button class="btn btn-danger-outline btn-small" type="button" data-delete="${prof.id}">Delete</button></li>`
     )
     .join('');
+}
+
+// The quiz-specific part of Settings. The chosen quiz draws its own options
+// and progress into the panel; a failure there never breaks the page.
+function renderGameSettings() {
+  const el = $('#game-settings');
+  const quiz = findGame(state.settingsGame) || currentGame();
+  fillGameSelect($('#set-game-view'), quiz?.id);
+  if (!quiz) {
+    el.innerHTML = '<p class="hint">No quizzes are available.</p>';
+    return;
+  }
+  try {
+    quiz.game.renderSettings(el);
+  } catch (err) {
+    console.warn(`${quiz.id}: settings failed to render:`, err);
+    el.innerHTML = '<p class="hint warn">The settings for this quiz could not be shown.</p>';
+  }
 }
 
 function drillSummary(mode, interval) {
@@ -608,11 +618,9 @@ function bindSettings() {
 
   $('#btn-settings-back').addEventListener('click', () => showView('welcome'));
 
-  $('#set-max-factor').addEventListener('change', (e) => {
-    const p = Profiles.active();
-    Profiles.setMaxFactor(p.id, Number(e.target.value));
-    renderSettings();
-    toast(`${p.name} now trains up to ${e.target.value} × ${e.target.value}.`);
+  $('#set-game-view').addEventListener('change', (e) => {
+    state.settingsGame = e.target.value;
+    renderGameSettings();
   });
 
   $('#set-mute').addEventListener('change', (e) => {
@@ -643,19 +651,6 @@ function bindSettings() {
     toast('Leaderboard cleared.');
   });
 
-  $('#btn-reset-progress').addEventListener('click', async () => {
-    const p = Profiles.active();
-    const ok = await confirmDialog({
-      title: 'Reset progress?',
-      message: `Reset ${p.name}'s times-tables weights and accuracy back to the start? High scores are kept.`,
-      okLabel: 'Reset progress',
-    });
-    if (!ok) return;
-    Profiles.resetProgress(p.id);
-    renderSettings();
-    toast('Progress reset.');
-  });
-
   $('#profile-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-delete]');
     if (!btn) return;
@@ -665,7 +660,7 @@ function bindSettings() {
     const ok = await confirmDialog({
       title: `Delete "${target.name}"?`,
       message:
-        `This permanently deletes ${target.name}'s profile, including all times-tables weights and accuracy. ` +
+        `This permanently deletes ${target.name}'s profile, including their progress in every quiz. ` +
         'Their scores stay on the shared leaderboard. This cannot be undone.',
       okLabel: 'Delete profile',
     });

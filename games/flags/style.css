@@ -1,0 +1,157 @@
+/* Flags of the World drill: the flag, the four answer tiles, and the
+   settings panel (region chips and the weight-of-every-flag tiles). */
+
+.flag-q { display: flex; flex-direction: column; align-items: center; gap: var(--s4); }
+.flag-prompt { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
+
+.flag-frame {
+  padding: 10px;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(var(--inset), var(--inset)) padding-box,
+    linear-gradient(135deg, rgba(127, 246, 255, .55), rgba(255, 94, 247, .45)) border-box;
+  border: 2px solid transparent;
+  box-shadow: 0 0 36px rgba(127, 246, 255, .14);
+  line-height: 0;
+}
+.flag-img {
+  display: block;
+  width: auto;
+  height: clamp(110px, 26vh, 180px);
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .45);
+  transition: height .25s ease;
+}
+#quiz-body.is-revealed .flag-prompt { display: none; }
+#quiz-body.is-revealed .flag-img { height: clamp(80px, 16vh, 120px); }
+
+.flag-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  width: 100%;
+}
+@media (max-width: 300px) {
+  .flag-options { grid-template-columns: minmax(0, 1fr); }
+}
+
+.flag-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 60px;
+  padding: var(--s3) var(--s4) var(--s3) var(--s3);
+  text-align: left;
+  font: 600 var(--text-md)/1.25 var(--sans);
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(127, 246, 255, .10), rgba(255, 94, 247, .05)),
+    var(--surface-raised);
+  border: 1px solid rgba(127, 246, 255, .28);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 4px 0 rgba(0, 0, 0, .35);
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .2s ease, opacity .2s ease;
+}
+.flag-option:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--cyan);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 6px 0 rgba(0, 0, 0, .35), 0 0 22px rgba(127, 246, 255, .25);
+}
+.flag-option:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 1px 0 rgba(0, 0, 0, .35);
+}
+.flag-option:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.flag-option:disabled { cursor: default; color: var(--text); }
+
+.flag-key {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-family: var(--pixel);
+  font-size: var(--px-xs);
+  color: var(--cyan);
+  background: rgba(127, 246, 255, .12);
+  border: 1px solid rgba(127, 246, 255, .3);
+}
+.flag-name { min-width: 0; overflow-wrap: anywhere; }
+
+/* After answering: the right one glows green, a wrong pick turns red. */
+.flag-option.is-correct {
+  border-color: var(--green);
+  background: linear-gradient(180deg, rgba(77, 255, 192, .28), rgba(77, 255, 192, .12)), var(--surface-raised);
+  box-shadow: 0 0 24px rgba(77, 255, 192, .35);
+}
+.flag-option.is-correct .flag-key { background: var(--green); border-color: var(--green); color: #06261b; }
+.flag-option.is-wrong {
+  border-color: var(--red);
+  background: linear-gradient(180deg, rgba(255, 94, 122, .28), rgba(255, 94, 122, .1)), var(--surface-raised);
+}
+.flag-option.is-wrong .flag-key { background: var(--red); border-color: var(--red); color: #2a0610; }
+.flag-option.is-correct::after,
+.flag-option.is-wrong::after {
+  margin-left: auto;
+  padding-left: var(--s2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.flag-option.is-correct::after { content: "✓"; color: var(--green); }
+.flag-option.is-wrong::after { content: "✗"; color: var(--red); }
+.flag-option.is-dim { opacity: .4; }
+
+/* ---------- Settings panel ---------- */
+.flag-regions { border: 0; margin: 0; padding: 0; min-width: 0; }
+.flag-regions legend { padding: 0; margin-bottom: var(--s2); }
+.flag-region-list { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.flag-region { position: relative; cursor: pointer; }
+.flag-region input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.flag-region span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 40px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--inset);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.flag-region span small { font-size: var(--text-xs); opacity: .8; }
+.flag-region input:checked + span {
+  color: var(--text);
+  border-color: var(--magenta);
+  background: rgba(255, 94, 247, .16);
+}
+.flag-region input:checked + span::before { content: "✓"; color: var(--magenta); }
+.flag-region input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.toughest li.flag-tough { align-items: center; font-family: var(--sans); font-size: var(--text-sm); font-weight: 600; }
+.flag-tough img, .flag-tile img { display: block; border-radius: 3px; object-fit: cover; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
+.flag-tough span { display: flex; flex-direction: column; gap: 2px; }
+
+.flag-group { margin: var(--s2) 0 0; font-size: var(--text-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.flag-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
+.flag-tile { position: relative; cursor: default; }
+.flag-tile img { width: 100%; height: auto; aspect-ratio: 4 / 3; }
+.flag-weight {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 18px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  text-align: center;
+}

@@ -1,9 +1,11 @@
 // Persistence layer. Everything lives in localStorage under three keys:
-//   tti.profiles.v1    – all profiles, their fact weights and quiz stats
+//   tti.profiles.v1    – all profiles, their drill timing and each game's data
 //   tti.leaderboard.v1 – one shared top-10 high-score list
 //   tti.settings.v1    – device-level sound settings
 // If localStorage is unavailable (private mode, blocked storage) we fall back
 // to an in-memory copy so the game still works for the session.
+
+import { clamp } from './weights.js';
 
 const KEYS = {
   profiles: 'tti.profiles.v1',
@@ -11,9 +13,6 @@ const KEYS = {
   settings: 'tti.settings.v1',
 };
 
-export const DEFAULT_MAX_FACTOR = 12;
-export const MIN_MAX_FACTOR = 2;
-export const MAX_MAX_FACTOR = 20;
 export const NAME_MAX_LENGTH = 16;
 export const LEADERBOARD_SIZE = 10;
 
@@ -58,76 +57,13 @@ export function storageIsPersistent() {
   return persistent;
 }
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-export const factKey = (a, b) => `${a}x${b}`;
-
 /* ------------------------------------------------------------------ */
-/* Seed facts                                                          */
-/* ------------------------------------------------------------------ */
-
-let seed = null;
-
-// Accepts the parsed contents of data/facts.json. A missing or malformed
-// file falls back to an all-ones 12x12 table so the game can still run.
-export function setSeed(json) {
-  const base = {
-    maxFactor: 12,
-    defaultWeight: 1,
-    minWeight: 1,
-    maxWeight: 10,
-    correctDelta: -1,
-    wrongDelta: 2,
-    facts: [],
-  };
-  const s = { ...base, ...(json && typeof json === 'object' ? json : {}) };
-  s.minWeight = Math.max(1, Number(s.minWeight) || 1);
-  s.maxWeight = Math.max(s.minWeight, Number(s.maxWeight) || 10);
-  s.defaultWeight = clamp(Number(s.defaultWeight) || 1, s.minWeight, s.maxWeight);
-  s.byKey = new Map();
-  for (const f of Array.isArray(s.facts) ? s.facts : []) {
-    const a = Number(f.a);
-    const b = Number(f.b);
-    if (!Number.isInteger(a) || !Number.isInteger(b)) continue;
-    const w = clamp(Number(f.weight) || s.defaultWeight, s.minWeight, s.maxWeight);
-    s.byKey.set(factKey(a, b), w);
-  }
-  seed = s;
-}
-
-export function seedConfig() {
-  if (!seed) setSeed(null);
-  return seed;
-}
-
-function seedWeight(a, b) {
-  const s = seedConfig();
-  return s.byKey.get(factKey(a, b)) ?? s.defaultWeight;
-}
-
-// Builds the fact map for 1..maxFactor. Facts already in `existing` keep their
-// weight and stats; new facts start at their seed (default) weight; facts
-// outside the range are dropped simply by not being copied.
-export function buildFacts(maxFactor, existing = {}) {
-  const out = {};
-  for (let a = 1; a <= maxFactor; a++) {
-    for (let b = 1; b <= maxFactor; b++) {
-      const k = factKey(a, b);
-      const old = existing && existing[k];
-      out[k] = old
-        ? { a, b, weight: old.weight, asked: old.asked || 0, correct: old.correct || 0 }
-        : { a, b, weight: seedWeight(a, b), asked: 0, correct: 0 };
-    }
-  }
-  return out;
-}
-
-/* ------------------------------------------------------------------ */
-/* Drill timing defaults (from data/config.json)                       */
+/* Drill timing defaults (from data/settings.json)                     */
 /* ------------------------------------------------------------------ */
 
 let drill = null;
 
-// Accepts the drillTiming object from data/config.json. Missing or bad
+// Accepts the drillTiming object from data/settings.json. Missing or bad
 // values fall back to random timing around 20 seconds.
 export function setDrillDefaults(json) {
   const j = json && typeof json === 'object' ? json : {};
@@ -162,7 +98,7 @@ function cleanDrill(d) {
 /* ------------------------------------------------------------------ */
 
 function emptyStore() {
-  return { version: 1, lastActiveId: null, profiles: {} };
+  return { version: 2, lastActiveId: null, profiles: {} };
 }
 
 function loadStore() {
@@ -176,6 +112,7 @@ function loadStore() {
 let store = loadStore();
 
 function save() {
+  store.version = 2;
   writeJSON(KEYS.profiles, store);
 }
 
@@ -183,18 +120,30 @@ function newId() {
   return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-function freshStats() {
-  return { asked: 0, correct: 0, wrong: 0, timeouts: 0 };
-}
-
-// "First use" of a profile: copy the seed facts into it. Also fills in
-// fields added in later versions (drill timing) for older profiles.
-function ensureFacts(p) {
-  if (!p.facts || typeof p.facts !== 'object' || !Object.keys(p.facts).length) {
-    p.facts = buildFacts(p.maxFactor);
+// Brings older profiles up to date. Version 1 kept the times-tables data
+// (maxFactor, facts, stats) on the profile itself; it now lives in that
+// game's bucket under p.games, like every other game's data.
+function ensureProfile(p) {
+  let changed = false;
+  if (!p.games || typeof p.games !== 'object') {
+    p.games = {};
+    changed = true;
   }
-  if (!p.stats) p.stats = freshStats();
-  if (!p.drill) p.drill = cleanDrill(null);
+  if ('facts' in p || 'maxFactor' in p || 'stats' in p) {
+    const tt = p.games['times-tables'] || (p.games['times-tables'] = {});
+    if (p.maxFactor && !tt.maxFactor) tt.maxFactor = p.maxFactor;
+    if (p.facts && !tt.facts) tt.facts = p.facts;
+    if (p.stats && !tt.stats) tt.stats = p.stats;
+    delete p.maxFactor;
+    delete p.facts;
+    delete p.stats;
+    changed = true;
+  }
+  if (!p.drill) {
+    p.drill = cleanDrill(null);
+    changed = true;
+  }
+  if (changed) save();
 }
 
 export const Profiles = {
@@ -219,7 +168,7 @@ export const Profiles = {
       store.lastActiveId = p ? p.id : null;
       if (p) save();
     }
-    if (p) ensureFacts(p);
+    if (p) ensureProfile(p);
     return p;
   },
 
@@ -243,12 +192,10 @@ export const Profiles = {
       name: name.trim(),
       createdAt: now,
       lastUsedAt: now,
-      maxFactor: DEFAULT_MAX_FACTOR,
-      facts: null,
-      stats: freshStats(),
+      game: null,
+      games: {},
       drill: cleanDrill(null),
     };
-    ensureFacts(p);
     store.profiles[p.id] = p;
     store.lastActiveId = p.id;
     save();
@@ -259,7 +206,7 @@ export const Profiles = {
     const p = store.profiles[id];
     if (!p) return null;
     p.lastUsedAt = Date.now();
-    ensureFacts(p);
+    ensureProfile(p);
     store.lastActiveId = id;
     save();
     return p;
@@ -274,16 +221,6 @@ export const Profiles = {
     return this.active();
   },
 
-  setMaxFactor(id, n) {
-    const p = store.profiles[id];
-    if (!p) return;
-    const max = clamp(Math.round(n), MIN_MAX_FACTOR, MAX_MAX_FACTOR);
-    ensureFacts(p);
-    p.maxFactor = max;
-    p.facts = buildFacts(max, p.facts);
-    save();
-  },
-
   setDrillTiming(id, patch) {
     const p = store.profiles[id];
     if (!p) return null;
@@ -292,54 +229,34 @@ export const Profiles = {
     return p.drill;
   },
 
-  resetProgress(id) {
+  // Which quiz this profile plays: a folder name under games/, or null for
+  // the default from data/settings.json.
+  setGame(id, gameId) {
     const p = store.profiles[id];
     if (!p) return;
-    p.facts = buildFacts(p.maxFactor);
-    p.stats = freshStats();
+    p.game = gameId;
     save();
   },
 
-  // Weighted-random pick: each fact's chance is weight / sum(weights).
-  // Avoids asking the exact same fact twice in a row when possible.
-  pickFact(id, avoidKey = null) {
+  // The profile's private data for one game. Each game owns the shape of
+  // its own bucket, changes it in place and calls Profiles.save().
+  gameData(id, gameId) {
     const p = store.profiles[id];
     if (!p) return null;
-    ensureFacts(p);
-    const facts = Object.values(p.facts);
-    const draw = () => {
-      const total = facts.reduce((sum, f) => sum + f.weight, 0);
-      let r = Math.random() * total;
-      for (const f of facts) {
-        r -= f.weight;
-        if (r < 0) return f;
-      }
-      return facts[facts.length - 1];
-    };
-    let f = draw();
-    if (facts.length > 1 && factKey(f.a, f.b) === avoidKey) f = draw();
-    if (facts.length > 1 && factKey(f.a, f.b) === avoidKey) f = draw();
-    return { a: f.a, b: f.b, key: factKey(f.a, f.b) };
+    ensureProfile(p);
+    return p.games[gameId] || (p.games[gameId] = {});
   },
 
-  // outcome: 'correct' | 'wrong' | 'timeout'. Returns the fact's new weight.
-  recordAnswer(id, a, b, outcome) {
+  resetGameData(id, gameId) {
     const p = store.profiles[id];
-    if (!p) return null;
-    ensureFacts(p);
-    const s = seedConfig();
-    const k = factKey(a, b);
-    const f = p.facts[k] || (p.facts[k] = { a, b, weight: s.defaultWeight, asked: 0, correct: 0 });
-    const ok = outcome === 'correct';
-    f.asked += 1;
-    if (ok) f.correct += 1;
-    f.weight = clamp(f.weight + (ok ? s.correctDelta : s.wrongDelta), s.minWeight, s.maxWeight);
-    p.stats.asked += 1;
-    if (ok) p.stats.correct += 1;
-    else if (outcome === 'timeout') p.stats.timeouts += 1;
-    else p.stats.wrong += 1;
+    if (!p) return;
+    ensureProfile(p);
+    p.games[gameId] = {};
     save();
-    return f.weight;
+  },
+
+  save() {
+    save();
   },
 };
 

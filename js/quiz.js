@@ -1,10 +1,10 @@
-// Times-tables interruption: a real-time scheduler that decides *when* a
-// drill fires, and the overlay UI that asks the question and shows feedback.
-// The app wires these to the game's hold/release (freeze/thaw) calls.
+// Drill interruption: a real-time scheduler that decides *when* a drill
+// fires, and the overlay UI that frames it. The overlay owns the title,
+// countdown and feedback; the current game draws the question itself into
+// the overlay's body (see js/games.js for that contract). The app wires
+// these to the arcade's hold/release (freeze/thaw) calls.
 
 import { Sfx } from './audio.js';
-
-export const QUIZ_SECONDS = 5;
 
 // Accumulates real seconds of active play and fires when the current gap
 // has passed. In "fixed" mode every gap equals the interval. In "random"
@@ -73,56 +73,59 @@ export class QuizUI {
   constructor(root) {
     this.root = root;
     this.$ = (sel) => root.querySelector(sel);
-    this.form = this.$('#quiz-form');
-    this.input = this.$('#quiz-input');
+    this.body = this.$('#quiz-body');
     this.count = this.$('#quiz-count');
     this.bar = this.$('#quiz-bar');
     this.timerBox = this.$('.quiz-timer');
     this.feedbackBox = this.$('#quiz-feedback');
     this.continueBtn = this.$('#quiz-continue');
-    // The form never navigates; ask() swaps in the real handler.
-    this.form.addEventListener('submit', (e) => e.preventDefault());
-    // Only digits in the answer box.
-    this.input.addEventListener('input', () => {
-      const clean = this.input.value.replace(/\D+/g, '').slice(0, 4);
-      if (clean !== this.input.value) this.input.value = clean;
-    });
+    this.handle = null;
+    this.cancel = null; // ends whatever ask() or feedback() is running
   }
 
   get visible() {
     return !this.root.hidden;
   }
 
-  // Shows "a × b = ?" with a countdown. Resolves with
-  // { outcome: 'correct' | 'wrong' | 'timeout', given: number|null }.
-  ask(fact, title) {
+  // Lets the game draw the question, then runs the countdown. Resolves with
+  // { outcome: 'correct' | 'wrong' | 'timeout', given }.
+  ask({ game, question, title, seconds }) {
     this.$('#quiz-title').textContent = title;
-    this.$('#quiz-a').textContent = fact.a;
-    this.$('#quiz-b').textContent = fact.b;
-    this.input.value = '';
-    this.input.disabled = false;
-    this.form.hidden = false;
+    this.root.dataset.game = game.id;
+    this.body.innerHTML = '';
+    this.body.hidden = false;
+    this.body.classList.remove('is-revealed');
     this.timerBox.hidden = false;
     this.feedbackBox.hidden = true;
     this.root.classList.remove('is-success', 'is-fail');
     this.root.hidden = false;
     Sfx.quizAlert();
-    setTimeout(() => this.input.focus({ preventScroll: true }), 30);
 
     return new Promise((resolve) => {
-      const total = QUIZ_SECONDS * 1000;
+      let finished = false;
+      const total = seconds * 1000;
       const deadline = performance.now() + total;
-      let shown = QUIZ_SECONDS;
+      let shown = seconds;
       this.count.textContent = shown;
       this.bar.style.transform = 'scaleX(1)';
       this.timerBox.classList.remove('urgent');
 
+      let handle = null;
       const finish = (outcome, given) => {
+        if (finished) return;
+        finished = true;
         clearInterval(timer);
-        this.form.onsubmit = null;
-        this.input.disabled = true;
+        handle?.lock?.();
+        if (this.cancel === cancel) this.cancel = null;
         resolve({ outcome, given });
       };
+      const cancel = () => finish('timeout', null);
+      this.cancel = cancel;
+
+      handle = game.game.renderQuestion(this.body, question, (outcome, given) =>
+        finish(outcome === 'correct' ? 'correct' : 'wrong', given)
+      ) || null;
+      this.handle = handle;
 
       const timer = setInterval(() => {
         const rem = Math.max(0, deadline - performance.now());
@@ -136,36 +139,30 @@ export class QuizUI {
         }
         if (rem <= 0) finish('timeout', null);
       }, 50);
-
-      this.form.onsubmit = (e) => {
-        e.preventDefault();
-        const v = this.input.value.trim();
-        if (!/^\d+$/.test(v)) {
-          this.input.classList.remove('shake');
-          void this.input.offsetWidth;
-          this.input.classList.add('shake');
-          return;
-        }
-        const n = Number(v);
-        finish(n === fact.a * fact.b ? 'correct' : 'wrong', n);
-      };
     });
   }
 
   // Shows the result. Resolves when the player continues or the panel
-  // times out on its own.
-  feedback({ outcome, fact, given, label, line }) {
+  // times out on its own. Games whose handle has reveal() keep their
+  // question on screen (e.g. to mark the right option); others are hidden.
+  feedback({ outcome, given, label, line, answer, givenText }) {
     const ok = outcome === 'correct';
-    this.form.hidden = true;
+    const reveal = this.handle?.reveal;
+    if (reveal) {
+      this.body.classList.add('is-revealed');
+      reveal.call(this.handle, { outcome, given });
+    } else {
+      this.body.hidden = true;
+    }
     this.timerBox.hidden = true;
     this.feedbackBox.hidden = false;
     this.root.classList.toggle('is-success', ok);
     this.root.classList.toggle('is-fail', !ok);
     this.$('#quiz-result').textContent = label;
     this.$('#quiz-line').textContent = line;
-    this.$('#quiz-answer').textContent = `${fact.a} × ${fact.b} = ${fact.a * fact.b}`;
+    this.$('#quiz-answer').textContent = answer;
     this.$('#quiz-given').textContent =
-      outcome === 'wrong' ? `You answered ${given}.` : outcome === 'timeout' ? 'No answer in time.' : '';
+      outcome === 'wrong' ? givenText || '' : outcome === 'timeout' ? 'No answer in time.' : '';
 
     const autoMs = ok ? 3000 : 5000;
     const auto = this.$('#quiz-auto');
@@ -184,8 +181,10 @@ export class QuizUI {
         clearTimeout(t);
         window.removeEventListener('keydown', onKey, true);
         this.continueBtn.onclick = null;
+        if (this.cancel === done) this.cancel = null;
         resolve();
       };
+      this.cancel = done;
       const onKey = (e) => {
         if ((e.key === 'Enter' || e.key === ' ') && performance.now() - shownAt > 400) {
           e.preventDefault();
@@ -200,6 +199,9 @@ export class QuizUI {
   }
 
   hide() {
+    this.cancel?.();
+    this.handle?.lock?.();
+    this.handle = null;
     this.root.hidden = true;
     this.root.classList.remove('is-success', 'is-fail');
   }

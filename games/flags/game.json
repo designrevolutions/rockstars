@@ -1,0 +1,7 @@
+{
+  "_comment": "Flags of the World drill. name is shown in the quiz menus. timeLimitSeconds is how long the player has to answer each drill. phrases and stylesheet are files in this folder that the app loads for this quiz.",
+  "name": "Flags of the World",
+  "timeLimitSeconds": 8,
+  "phrases": "phrases.json",
+  "stylesheet": "style.css"
+}

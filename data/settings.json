@@ -1,0 +1,22 @@
+{
+  "_comment": "App-wide settings. defaultGame is the folder name (under games/) of the quiz new profiles start on; it must be listed in games/games.json. drillTiming seeds each new profile's drill settings; players can change their own in Settings. mode is \"random\" (a random moment around intervalSeconds) or \"fixed\" (exactly every intervalSeconds). randomSpread 0.5 means random gaps fall between 0.5x and 1.5x the interval. voice sets how drill lines are spoken; a game's phrases.json may override any of it with its own voice block.",
+  "defaultGame": "times-tables",
+  "drillTiming": {
+    "mode": "random",
+    "intervalSeconds": 20,
+    "minIntervalSeconds": 10,
+    "maxIntervalSeconds": 300,
+    "randomSpread": 0.5
+  },
+  "voice": {
+    "enabled": true,
+    "lang": "en-GB",
+    "rate": 0.95,
+    "pitch": 0.75,
+    "preferredVoices": [
+      "Google UK English Male",
+      "Daniel",
+      "Microsoft Ryan Online (Natural) - English (United Kingdom)"
+    ]
+  }
+}

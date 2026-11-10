@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="A Space Invaders-style arcade game with times-tables training drills.">
+<meta name="description" content="A Space Invaders-style arcade game with training drills: times tables, flags of the world and more.">
 <meta name="theme-color" content="#060818">
 <title>Times Table Invaders</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8' shape-rendering='crispEdges'%3E%3Cpath fill='%237ff6ff' d='M2 0h1v1H2zM8 0h1v1H8zM3 1h1v1H3zM7 1h1v1H7zM2 2h7v1H2zM1 3h2v1H1zM4 3h3v1H4zM8 3h2v1H8zM0 4h11v1H0zM0 5h1v1H0zM2 5h7v1H2zM10 5h1v1h-1zM0 6h1v1H0zM2 6h1v1H2zM8 6h1v1H8zM10 6h1v1h-1zM3 7h2v1H3zM6 7h2v1H6z'/%3E%3C/svg%3E">
@@ -43,6 +43,10 @@
       <div class="card welcome-card">
         <div id="welcome-returning" hidden>
           <p class="welcome-line"><span id="welcome-greeting">Welcome back,</span> <strong id="welcome-name"></strong></p>
+          <label class="field">
+            <span class="field-label">Quiz</span>
+            <select id="game-select"></select>
+          </label>
           <button id="btn-play" class="btn btn-primary btn-big" type="button">Play</button>
           <label class="field">
             <span class="field-label">Switch user</span>
@@ -77,7 +81,7 @@
     <p class="help">
       <span class="help-keys">Move with ← → or A D, fire with Space, pause with P and mute with M.</span>
       <span class="help-touch">Use the arrow buttons to move and FIRE to shoot.</span>
-      Every so often a times-tables drill freezes the battle. Answer it to keep training.
+      Every so often a quiz drill freezes the battle. Answer it to keep training.
     </p>
     <p id="intro-link-row" class="intro-link-row" hidden><button id="btn-play-intro" class="link-btn" type="button">Play intro</button></p>
     <p id="storage-warning" class="error" hidden>Your browser is blocking local storage, so profiles and scores will not be saved after you close this tab.</p>
@@ -116,13 +120,7 @@
       <div id="quiz-overlay" class="overlay quiz" hidden role="dialog" aria-modal="true" aria-labelledby="quiz-title">
         <div class="card quiz-card">
           <p id="quiz-title" class="quiz-title"></p>
-          <form id="quiz-form" autocomplete="off">
-            <div class="quiz-q">
-              <span id="quiz-a"></span><span class="op">×</span><span id="quiz-b"></span><span class="op">=</span>
-              <input id="quiz-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" aria-label="Your answer">
-            </div>
-            <button class="btn btn-primary" type="submit">Submit</button>
-          </form>
+          <div id="quiz-body"></div>
           <div class="quiz-timer">
             <span id="quiz-count" class="quiz-count" aria-live="off">5</span>
             <div class="quiz-track"><div id="quiz-bar" class="quiz-bar"></div></div>
@@ -157,11 +155,8 @@
       <section class="card">
         <h2 class="card-title">Profile</h2>
         <p class="card-lead">Playing as <strong id="set-name"></strong></p>
-        <label class="field">
-          <span class="field-label">Times tables up to</span>
-          <select id="set-max-factor"></select>
-        </label>
-        <p class="hint">Only this profile changes. Facts still in range keep their weights, new facts start fresh and facts out of range are dropped.</p>
+        <p class="card-lead">Quiz <strong id="set-game"></strong></p>
+        <p class="hint">Choose which quiz to play on the main menu. Drill timing and sound apply to every quiz.</p>
       </section>
 
       <section class="card">
@@ -184,18 +179,15 @@
         <p id="drill-override" class="hint warn" hidden></p>
       </section>
 
-      <section class="card span-2">
-        <h2 class="card-title">Times-tables progress</h2>
-        <div id="set-stats" class="stats"></div>
-        <div class="card-section">
-          <h3 class="sub-title">Needs the most training</h3>
-          <ol id="set-toughest" class="toughest"></ol>
-        </div>
-        <div class="card-section">
-          <h3 class="sub-title">Weight of every fact</h3>
-          <p id="weight-hint" class="hint"></p>
-          <div class="grid-scroll"><div id="weight-grid" class="weight-grid"></div></div>
-        </div>
+      <section class="card span-2 game-settings-card">
+        <header class="game-settings-header">
+          <h2 class="card-title">Quiz settings and progress</h2>
+          <label class="field game-settings-pick">
+            <span class="field-label">Show settings for</span>
+            <select id="set-game-view"></select>
+          </label>
+        </header>
+        <div id="game-settings" class="game-settings"></div>
       </section>
 
       <section class="card">
@@ -218,10 +210,6 @@
       <section class="card span-2 danger-zone">
         <h2 class="card-title">Profiles and data</h2>
         <ul id="profile-list" class="profile-list"></ul>
-        <div class="danger-row">
-          <button id="btn-reset-progress" class="btn btn-danger-outline" type="button">Reset my progress</button>
-          <p class="hint">Puts this profile's weights and accuracy back to the start. High scores are kept.</p>
-        </div>
       </section>
     </div>
   </section>

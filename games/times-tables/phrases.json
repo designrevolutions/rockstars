@@ -1,5 +1,5 @@
 {
-  "_comment": "Lines shown (and optionally spoken) around each times-tables drill. Any line may be a single string or an array of strings; arrays are drawn from a shuffled no-repeat bag, so every phrase is used once before any repeats.",
+  "_comment": "Lines shown (and optionally spoken) around each times-tables drill. Any line may be a single string or an array of strings; arrays are drawn from a shuffled no-repeat bag, so every phrase is used once before any repeats. The speaking voice is set in data/settings.json.",
   "title": "Training drill, soldier!",
   "success": [
     "You are amazing — you are my best friend.",
@@ -107,12 +107,5 @@
   ],
   "correctLabel": "Correct!",
   "wrongLabel": "Wrong!",
-  "timeoutLabel": "Time's up!",
-  "voice": {
-    "enabled": true,
-    "lang": "en-GB",
-    "rate": 0.95,
-    "pitch": 0.75,
-    "preferredVoices": ["Google UK English Male", "Daniel", "Microsoft Ryan Online (Natural) - English (United Kingdom)"]
-  }
+  "timeoutLabel": "Time's up!"
 }
