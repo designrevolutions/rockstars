@@ -15,6 +15,7 @@
 <style>
 #refresh-hint { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 10px; background: #050613; color: #ffd23f; border-bottom: 1px solid rgba(127,246,255,.3); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; padding: 10px 14px; text-align: center; }
 #refresh-hint button { background: none; border: 1px solid #ffd23f; color: #ffd23f; border-radius: 4px; padding: 2px 8px; font: inherit; line-height: 1; cursor: pointer; }
+#refresh-hint[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -27,7 +28,8 @@
   } catch (e) {}
   var el = document.getElementById('refresh-hint');
   el.hidden = false;
-  document.getElementById('refresh-hint-close').addEventListener('click', function () { el.hidden = true; });
+  var timer = setTimeout(function () { el.hidden = true; }, 10000);
+  document.getElementById('refresh-hint-close').addEventListener('click', function () { clearTimeout(timer); el.hidden = true; });
 })();
 </script>
 <div class="backdrop" aria-hidden="true">
